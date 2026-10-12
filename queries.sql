@@ -74,6 +74,3 @@ EXPLAIN ANALYZE
 SELECT o.id, d.assigned_at FROM orphans o
 JOIN deliveries d ON d.package_id = o.id
 ORDER BY d.assigned_at ASC; 
-
-
--- Video overview: <https://youtu.be/ziYXj9axdkc>
