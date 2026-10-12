@@ -1,0 +1,162 @@
+DROP TABLE
+DROP TABLE
+DROP TABLE
+DROP TABLE
+DROP TABLE
+DROP TABLE
+DROP ROLE
+DROP ROLE
+CREATE EXTENSION
+DROP TYPE
+CREATE TYPE
+CREATE TABLE
+DROP TYPE
+CREATE TYPE
+CREATE TABLE
+DROP TYPE
+CREATE TYPE
+CREATE TABLE
+DROP TYPE
+CREATE TYPE
+CREATE TABLE
+DROP TYPE
+CREATE TYPE
+CREATE TABLE
+CREATE TABLE
+DROP VIEW
+CREATE VIEW
+DROP VIEW
+CREATE VIEW
+DROP VIEW
+CREATE VIEW
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+CREATE INDEX
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE ROLE
+CREATE ROLE
+GRANT ROLE
+GRANT ROLE
+ setseed 
+---------
+ 
+(1 row)
+
+TRUNCATE TABLE
+INSERT 0 6
+INSERT 0 7
+INSERT 0 72
+INSERT 0 72
+CREATE TABLE
+INSERT 0 5
+INSERT 0 100000
+ packages_inserted | seconds | packages_per_sec_with_triggers 
+-------------------+---------+--------------------------------
+            100000 |    2.78 |                          35951
+(1 row)
+
+UPDATE 15190
+ALTER TABLE
+INSERT 0 84810
+INSERT 0 48
+UPDATE 48
+UPDATE 48
+UPDATE 48
+ALTER TABLE
+VACUUM
+    tbl     | count  
+------------+--------
+ zones      |      6
+ warehouses |      7
+ drivers    |     72
+ vehicles   |     72
+ deliveries |  84858
+ packages   | 100000
+(6 rows)
+
+  name  | packages | pending | shipped | delivered 
+--------+----------+---------+---------+-----------
+ Zone A |    29525 |    4392 |       8 |     25125
+ Zone B |    24790 |    3723 |       8 |     21059
+ Zone C |    19873 |    3086 |       8 |     16779
+ Zone D |    15108 |    2319 |       8 |     12781
+ Zone E |      528 |      79 |       8 |       441
+ Zone F |    10176 |    1543 |       8 |      8625
+(6 rows)
+
+ orphan_packages 
+-----------------
+             430
+(1 row)
+
+Pager usage is off.
+CREATE FUNCTION
+CREATE TABLE
+INSERT 0 14
+ packages | deliveries 
+----------+------------
+   100000 |      84858
+(1 row)
+
+                           label                           | with_index_ms | no_index_ms | speedup_x 
+-----------------------------------------------------------+---------------+-------------+-----------
+ G01 packages within ~500 m of a point (GiST)              |         0.369 |      16.730 |      45.3
+ G02 packages inside zone 5 boundary (GiST containment)    |         0.276 |      23.245 |      84.2
+ Q01 package by id (PK)                                    |         0.004 |       4.626 |    1156.5
+ Q02 pending packages                                      |         1.402 |       6.517 |       4.6
+ Q03 packages in zone 1 (big zone)                         |         2.367 |       6.420 |       2.7
+ Q03b packages in zone 5 (small zone)                      |         0.070 |       5.968 |      85.3
+ Q04 packages in warehouse 1                               |         2.137 |       6.059 |       2.8
+ Q05 stuck deliveries, AS WRITTEN (no delivered_at filter) |        11.209 |      11.189 |       1.0
+ Q05b stuck deliveries, CORRECTED                          |         4.186 |       3.313 |       0.8
+ Q06 possibly missing (geography cast)                     |        29.182 |      29.842 |       1.0
+ Q07 full delivery details for one package                 |         0.019 |       2.838 |     149.4
+ Q08 package volume per zone                               |        22.605 |      22.560 |       1.0
+ Q09 available drivers with no open delivery               |         3.610 |       3.609 |       1.0
+ Q10 orphan packages by age                                |        66.712 |      78.462 |       1.2
+(14 rows)
+
+CREATE INDEX
+ANALYZE
+                                label                                 | with_index_ms | no_index_ms | speedup_x 
+----------------------------------------------------------------------+---------------+-------------+-----------
+ Q05b stuck deliveries, CORRECTED  [+ idx_deliveries_open]            |         0.003 |       4.051 |    1350.3
+ Q09 available drivers with no open delivery  [+ idx_deliveries_open] |         0.019 |       3.756 |     197.7
+(2 rows)
+

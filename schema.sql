@@ -52,10 +52,10 @@ CREATE TABLE zones (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     status zone_status NOT NULL,
-    boundary GEOMETRY(POLYGON, 4326) NOT NULL,
-
-    -- Table level exclusion constraint to prevent overlapping polygons 
-    EXCLUDE USING GIST (boundary WITH &&) -- GIST already creates and uses an index on the boundary column, && is POSTGIS overlap symbol
+    boundary GEOMETRY(POLYGON, 4326) NOT NULL
+    -- Overlap between active zones is enforced by trg_zones_no_overlap (see TRIGGERS section).
+    -- An EXCLUDE ... WITH && constraint was NOT used: && compares bounding boxes only, so it
+    -- rejects valid zones whose boxes overlap even though the shapes do not.
 );
 
 -- Table for drivers
@@ -173,6 +173,9 @@ ORDER BY p.zone_id;
 ---------------------------- INDEXES (Optimisation) ----------------------------
 
 -- 1. GIST INDEXES for the columns using GEOMETRY data type --> faster search for package-in-zone cases 
+DROP INDEX IF EXISTS idx_zones_boundary;
+CREATE INDEX idx_zones_boundary ON zones USING GIST (boundary);
+
 DROP INDEX IF EXISTS idx_warehouses_location;
 CREATE INDEX idx_warehouses_location ON warehouses USING GIST (location);
 
@@ -216,7 +219,7 @@ CREATE INDEX idx_deliveries_package_id ON deliveries (package_id);
 
 -- 1. Auto assign active zone and warehouse on package INSERT or destination UPDATE
 CREATE OR REPLACE FUNCTION auto_zone_warehouse()
-RETURNS TRIGGER AS $$   -- $$ tells SQL to not end the query until it sees another $$ symbol
+RETURNS TRIGGER AS $$   -- the dollar-quote opens the function body; it ends at the next dollar-quote
 BEGIN 
     -- Find and set an active zone for the package destination
     SELECT id INTO NEW.zone_id
@@ -362,6 +365,44 @@ CREATE TRIGGER trg_delivery_status_sync
 AFTER INSERT OR UPDATE ON deliveries
 FOR EACH ROW 
 EXECUTE FUNCTION sync_delivery_status();
+
+
+-- 4. Block overlapping ACTIVE zones (exact geometry, checked at COMMIT)
+--- DEFERRABLE INITIALLY DEFERRED: the check runs once at the end of the transaction, so a script such as
+--- auto_zones.py can rewrite several zones in a row without tripping over a neighbour's old boundary.
+--- ST_Relate with the pattern T******** is true only when the INTERIORS intersect, so zones that merely
+--- share an edge are allowed. The && test first uses the GiST index to shortlist candidates.
+CREATE OR REPLACE FUNCTION zones_no_overlap()
+RETURNS TRIGGER AS $$
+DECLARE
+    cur zones%ROWTYPE;
+BEGIN
+    SELECT * INTO cur FROM zones WHERE id = NEW.id;   -- latest version of this row at commit time
+    IF NOT FOUND OR cur.status <> 'Active' THEN
+        RETURN NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM zones z
+        WHERE z.id <> cur.id
+          AND z.status = 'Active'
+          AND z.boundary && cur.boundary
+          AND ST_Relate(z.boundary, cur.boundary, 'T********')
+    ) THEN
+        RAISE EXCEPTION 'Zone "%" overlaps another active zone', cur.name
+            USING ERRCODE = 'exclusion_violation';
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_zones_no_overlap ON zones;
+CREATE CONSTRAINT TRIGGER trg_zones_no_overlap
+AFTER INSERT OR UPDATE OF boundary, status ON zones
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION zones_no_overlap();
 
 
 ---------------------------- Rule-Based Access Control (RBAC) ----------------------------
